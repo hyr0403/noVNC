@@ -517,4 +517,4 @@ Util.Localisation = {
     },
 };
 
-/* [module] export default Util; */
+export default Util;
