@@ -11,12 +11,15 @@
 /* jslint white: false, browser: true */
 /* global window, document.getElementById, Util, WebUtil, RFB, Display */
 
-import Util from "../core/util.js";
+import * as Log from '../core/util/logging.js';
+import _, { l10n } from '../core/util/localization.js'
+import { isTouchDevice, browserSupportsCursorURIs as cursorURIsSupported } from '../core/util/browsers.js';
+import { getPointerEvent } from '../core/util/events.js';
 import KeyTable from "../core/input/keysym.js";
 import keysyms from "../core/input/keysymdef.js";
 import RFB from "../core/rfb.js";
 import Display from "../core/display.js";
-import WebUtil from "./webutil.js";
+import * as WebUtil from "./webutil.js";
 
 var UI;
 
@@ -65,18 +68,16 @@ var UI;
 
     // Set up translations
     var LINGUAS = ["de", "el", "nl", "sv"];
-    Util.Localisation.setup(LINGUAS);
-    if (Util.Localisation.language !== "en" && Util.Localisation.dictionary !== undefined) {
+    l10n.setup(LINGUAS);
+    if (l10n.language !== "en" && l10n.dictionary !== undefined) {
         // NB: this only works with "native" ES6 modules and SystemJS modules -- the Babel translaters
         // for CommonJS and AMD don't support this.  However, it is fairly easy to perform this logic
         // yourself if you wish to package noVNC in CommonJS or AMD formats: simply load the appropriate
-        // language module and set Util.Localisation.dictionary to the default export of it.
-        import(`./locale/${Util.Localisation.language}.js`).then((language_mod) => {
-            Util.Localisation.dictionary = language_mod.default;
+        // language module and set l10n.dictionary to the default export of it.
+        import(`./locale/${l10n.language}.js`).then((language_mod) => {
+            l10n.dictionary = language_mod.default;
         });
     }
-
-    var _ = Util.Localisation.get;
 
     UI = {
 
@@ -119,10 +120,10 @@ var UI;
             UI.initSettings();
 
             // Translate the DOM
-            Util.Localisation.translateDOM();
+            l10n.translateDOM();
 
             // Adapt the interface for touch screen devices
-            if (Util.isTouchDevice) {
+            if (isTouchDevice) {
                 document.documentElement.classList.add("noVNC_touch");
                 // Remove the address bar
                 setTimeout(function() { window.scrollTo(0, 1); }, 100);
@@ -220,7 +221,7 @@ var UI;
             UI.initSetting('port', port);
             UI.initSetting('encrypt', (window.location.protocol === "https:"));
             UI.initSetting('true_color', true);
-            UI.initSetting('cursor', !Util.isTouchDevice);
+            UI.initSetting('cursor', !isTouchDevice);
             UI.initSetting('resize', 'off');
             UI.initSetting('shared', true);
             UI.initSetting('view_only', false);
@@ -246,7 +247,7 @@ var UI;
                 return true;
             } catch (exc) {
                 var msg = "Unable to create RFB client -- " + exc;
-                Util.Error(msg);
+                Log.Error(msg);
                 UI.showStatus(msg, 'error');
                 return false;
             }
@@ -479,7 +480,7 @@ var UI;
                     break;
                 default:
                     msg = "Invalid UI state";
-                    Util.Error(msg);
+                    Log.Error(msg);
                     UI.showStatus(msg, 'error');
                     break;
             }
@@ -489,13 +490,13 @@ var UI;
 
         // Disable/enable controls depending on connection state
         updateVisualState: function() {
-            //Util.Debug(">> updateVisualState");
+            //Log.Debug(">> updateVisualState");
             document.getElementById('noVNC_setting_encrypt').disabled = UI.connected;
             document.getElementById('noVNC_setting_true_color').disabled = UI.connected;
-            if (Util.browserSupportsCursorURIs()) {
+            if (cursorURIsSupported()) {
                 document.getElementById('noVNC_setting_cursor').disabled = UI.connected;
             } else {
-                UI.updateSetting('cursor', !Util.isTouchDevice);
+                UI.updateSetting('cursor', !isTouchDevice);
                 document.getElementById('noVNC_setting_cursor').disabled = true;
             }
 
@@ -541,7 +542,7 @@ var UI;
             document.getElementById('noVNC_password_dlg')
                 .classList.remove('noVNC_open');
 
-            //Util.Debug("<< updateVisualState");
+            //Log.Debug("<< updateVisualState");
         },
 
         showStatus: function(text, status_type, time) {
@@ -655,7 +656,7 @@ var UI;
         dragControlbarHandle: function (e) {
             if (!UI.controlbarGrabbed) return;
 
-            var ptr = Util.getPointerEvent(e);
+            var ptr = getPointerEvent(e);
 
             var anchor = document.getElementById('noVNC_control_bar_anchor');
             if (ptr.clientX < (window.innerWidth * 0.1)) {
@@ -752,7 +753,7 @@ var UI;
         controlbarHandleMouseDown: function(e) {
             if ((e.type == "mousedown") && (e.button != 0)) return;
 
-            var ptr = Util.getPointerEvent(e);
+            var ptr = getPointerEvent(e);
 
             var handle = document.getElementById("noVNC_control_bar_handle");
             var bounds = handle.getBoundingClientRect();
@@ -838,7 +839,7 @@ var UI;
                 val = ctrl.value;
             }
             WebUtil.writeSetting(name, val);
-            //Util.Debug("Setting saved '" + name + "=" + val + "'");
+            //Log.Debug("Setting saved '" + name + "=" + val + "'");
             return val;
         },
 
@@ -888,10 +889,10 @@ var UI;
             // Refresh UI elements from saved cookies
             UI.updateSetting('encrypt');
             UI.updateSetting('true_color');
-            if (Util.browserSupportsCursorURIs()) {
+            if (cursorURIsSupported()) {
                 UI.updateSetting('cursor');
             } else {
-                UI.updateSetting('cursor', !Util.isTouchDevice);
+                UI.updateSetting('cursor', !isTouchDevice);
                 document.getElementById('noVNC_setting_cursor').disabled = true;
             }
             UI.updateSetting('clip');
@@ -1004,9 +1005,9 @@ var UI;
         },
 
         clipboardReceive: function(rfb, text) {
-            Util.Debug(">> UI.clipboardReceive: " + text.substr(0,40) + "...");
+            Log.Debug(">> UI.clipboardReceive: " + text.substr(0,40) + "...");
             document.getElementById('noVNC_clipboard_text').value = text;
-            Util.Debug("<< UI.clipboardReceive");
+            Log.Debug("<< UI.clipboardReceive");
         },
 
         clipboardClear: function() {
@@ -1016,9 +1017,9 @@ var UI;
 
         clipboardSend: function() {
             var text = document.getElementById('noVNC_clipboard_text').value;
-            Util.Debug(">> UI.clipboardSend: " + text.substr(0,40) + "...");
+            Log.Debug(">> UI.clipboardSend: " + text.substr(0,40) + "...");
             UI.rfb.clipboardPasteFrom(text);
-            Util.Debug("<< UI.clipboardSend");
+            Log.Debug("<< UI.clipboardSend");
         },
 
 /* ------^-------
@@ -1052,7 +1053,7 @@ var UI;
 
             if ((!host) || (!port)) {
                 var msg = _("Must set host and port");
-                Util.Error(msg);
+                Log.Error(msg);
                 UI.showStatus(msg, 'error');
                 return;
             }
@@ -1141,7 +1142,7 @@ var UI;
             if (typeof msg === 'undefined') {
                 msg = _("Password is required");
             }
-            Util.Warn(msg);
+            Log.Warn(msg);
             UI.showStatus(msg, "warning");
         },
 
@@ -1233,7 +1234,7 @@ var UI;
                     UI.resizeTimeout = setTimeout(function(){
                         // Request a remote size covering the viewport
                         if (UI.rfb.requestDesktopSize(screen.w, screen.h)) {
-                            Util.Debug('Requested new desktop size: ' +
+                            Log.Debug('Requested new desktop size: ' +
                                        screen.w + 'x' + screen.h);
                         }
                     }, 500);
@@ -1244,7 +1245,7 @@ var UI;
 
                     if (!UI.rfb.get_view_only()) {
                         UI.rfb.get_mouse().set_scale(scaleRatio);
-                        Util.Debug('Scaling by ' + UI.rfb.get_mouse().get_scale());
+                        Log.Debug('Scaling by ' + UI.rfb.get_mouse().get_scale());
                     }
                 }
             }
@@ -1322,7 +1323,7 @@ var UI;
                 var msg = _("Forcing clipping mode since " +
                             "scrollbars aren't supported " +
                             "by IE in fullscreen");
-                Util.Debug(msg);
+                Log.Debug(msg);
                 UI.showStatus(msg);
                 UI.rememberedClipSetting = UI.getSetting('clip');
                 UI.setViewClip(true);
@@ -1332,11 +1333,11 @@ var UI;
                 // Restore view clip to what it was before fullscreen on IE
                 UI.setViewClip(UI.rememberedClipSetting);
                 document.getElementById('noVNC_setting_clip').disabled =
-                    UI.connected || Util.isTouchDevice;
+                    UI.connected || isTouchDevice;
             } else {
                 document.getElementById('noVNC_setting_clip').disabled =
-                    UI.connected || Util.isTouchDevice;
-                if (Util.isTouchDevice) {
+                    UI.connected || isTouchDevice;
+                if (isTouchDevice) {
                     UI.setViewClip(true);
                 }
             }
@@ -1394,7 +1395,7 @@ var UI;
 
             // Different behaviour for touch vs non-touch
             // The button is disabled instead of hidden on touch devices
-            if (Util.isTouchDevice) {
+            if (isTouchDevice) {
                 viewDragButton.classList.remove("noVNC_hidden");
 
                 if (clipping) {
@@ -1420,7 +1421,7 @@ var UI;
  * ------v------*/
 
         showVirtualKeyboard: function() {
-            if (!Util.isTouchDevice) return;
+            if (!isTouchDevice) return;
 
             var input = document.getElementById('noVNC_keyboardinput');
 
@@ -1436,7 +1437,7 @@ var UI;
         },
 
         hideVirtualKeyboard: function() {
-            if (!Util.isTouchDevice) return;
+            if (!isTouchDevice) return;
 
             var input = document.getElementById('noVNC_keyboardinput');
 
